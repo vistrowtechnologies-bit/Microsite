@@ -64,16 +64,27 @@ export default function Home() {
         <button className="menu-button" onClick={() => setMenu(!menu)} aria-label="Toggle menu" aria-expanded={menu}>{menu ? "×" : "☰"}</button>
       </nav>
 
-      <section className="hero">
-        <div className="eyebrow"><span>●</span> Built for India’s property professionals</div>
-        <h1>Upload every file.<br/><em>Share one property link.</em></h1>
-        <p className="hero-copy">Drop the developer brochure, price sheet, floor plans, photos and WhatsApp text together. Nestory AI turns the mess into a polished, buyer-ready microsite for you to review and share.</p>
-        <div className="hero-actions">
-          <button className="button coral" onClick={() => navigate("signup")}>Create with AI <Arrow /></button>
-          <button className="play-button" onClick={() => navigate("property")}><span>▶</span> See a live example</button>
+      <section className="hero phase-one-hero">
+        <div className="hero-main-copy">
+          <div className="eyebrow"><span>●</span> AI workspace for Indian brokers & CPs</div>
+          <h1>Builder files in.<br/><em>Client-ready link out.</em></h1>
+          <p className="hero-copy">Upload brochures, price sheets, floor plans, photos and copied WhatsApp text together. Review the facts Nestory extracts, then publish a property microsite branded with your firm.</p>
+          <div className="hero-actions">
+            <button className="button coral" onClick={() => navigate("signup")}>Upload a project free <Arrow /></button>
+            <button className="play-button" onClick={() => navigate("property")}><span>▶</span> View the buyer experience</button>
+          </div>
+          <div className="trust-row"><span>No credit card</span><i/> <span>Human approval required</span><i/> <span>Your firm branding</span></div>
         </div>
-        <div className="trust-row"><span>No credit card</span><i/> <span>Draft in under 3 minutes</span><i/> <span>Nothing publishes without your approval</span></div>
+        <div className="hero-product" aria-label="Interactive Nestory workflow demo">
+          <div className="hero-product-top"><span>VERDANT HEIGHTS</span><b>AI project draft</b><small>● Autosaved</small></div>
+          <div className="hero-product-tabs">{["Upload","Review","Microsite"].map((label,index)=><button key={label} className={demoStep===index?"active":""} onClick={()=>setDemoStep(index)}>{index+1}. {label}</button>)}</div>
+          {demoStep===0&&<div className="hero-upload-demo"><div className="hero-drop"><span>↥</span><strong>Developer package</strong><small>Drop every file together</small></div><div className="hero-files"><span><b>PDF</b> Project brochure <small>Ready</small></span><span><b>XLS</b> July price sheet <small>Ready</small></span><span><b>IMG</b> 18 photos + 4 plans <small>Ready</small></span><span><b>TXT</b> WhatsApp notes <small>Ready</small></span></div><button onClick={()=>setDemoStep(1)}>Generate project draft ✦</button></div>}
+          {demoStep===1&&<div className="hero-review-demo"><div className="review-demo-head"><span><b>42 of 45 facts</b><small>2 need review · 1 missing</small></span><strong>93% complete</strong></div><label><span>Project name <b>96%</b></span><strong>Verdant Heights</strong><small>Brochure · Page 1</small></label><label><span>Starting price <b className="warn">Review</b></span><strong>₹1.48 Cr</strong><small>Price sheet · Row 3</small></label><label><span>Possession <b className="warn">Conflict</b></span><strong>December 2028</strong><small>Brochure says Dec ’28 · RERA says Mar ’29</small></label><button onClick={()=>setDemoStep(2)}>Preview approved page ↗</button></div>}
+          {demoStep===2&&<div className="hero-microsite-demo"><div className="hero-broker"><span className="broker-mark small">PH</span><b>Prophunt LLP</b><small>RERA verified</small></div><img src={photos[0]} alt="Verdant Heights generated property microsite"/><div><span>NEW LAUNCH · RERA VERIFIED</span><h3>Verdant Heights</h3><p>Kharadi, Pune · 3 & 4 BHK</p><strong>₹1.48 Cr onwards</strong><button onClick={()=>navigate("property")}>Open full microsite ↗</button></div></div>}
+        </div>
       </section>
+
+      <section className="phase-one-proof" aria-label="Product workflow highlights"><div><strong>1 upload</strong><span>PDFs, sheets, images and text</span></div><div><strong>Source-backed</strong><span>Every critical fact is reviewable</span></div><div><strong>1 live link</strong><span>Update once, share repeatedly</span></div></section>
 
       <section className="product-stage" aria-label="Product preview">
         <div className="orb orb-one"/><div className="orb orb-two"/>

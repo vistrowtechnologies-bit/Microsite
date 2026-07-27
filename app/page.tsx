@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 
-type Screen = "home" | "dashboard" | "property" | "new";
+type Screen = "home" | "dashboard" | "properties" | "property" | "new";
 
 const photos = [
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1600&q=85",
@@ -11,6 +11,13 @@ const photos = [
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=85",
   "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1000&q=85",
   "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1000&q=85",
+];
+
+const propertyInventory = [
+  { title: "Verdant Heights", developer: "Aurum Developers", place: "Kharadi, Pune", price: "₹1.48 Cr", config: "3 & 4 BHK", status: "Published", views: 1204, leads: 48, updated: "27 Jul 2026", image: photos[0] },
+  { title: "The Canopy", developer: "Canopy Living", place: "Baner, Pune", price: "₹2.10 Cr", config: "3 & 4 BHK", status: "Published", views: 892, leads: 32, updated: "26 Jul 2026", image: photos[2] },
+  { title: "Riverstone", developer: "Riverstone Group", place: "Koregaon Park, Pune", price: "₹3.25 Cr", config: "4 BHK", status: "Draft", views: 2450, leads: 112, updated: "24 Jul 2026", image: photos[4] },
+  { title: "Skyline One", developer: "Skyline Spaces", place: "Wakad, Pune", price: "₹94 L", config: "2 & 3 BHK", status: "Published", views: 630, leads: 14, updated: "22 Jul 2026", image: photos[3] },
 ];
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
@@ -26,6 +33,7 @@ export default function Home() {
   };
 
   if (screen === "dashboard") return <Dashboard onNavigate={navigate} />;
+  if (screen === "properties") return <PropertiesPage onNavigate={navigate} />;
   if (screen === "property") return <PropertyPage onNavigate={navigate} />;
   if (screen === "new") return <NewProperty onNavigate={navigate} />;
 
@@ -129,7 +137,7 @@ function Dashboard({ onNavigate }: { onNavigate: (s: Screen) => void }) {
     { title: "Riverstone", place: "Koregaon Park, Pune", price: "₹3.25 Cr", status: "Draft", views: 0, image: photos[4] },
   ];
   return <main className="app-shell">
-    <aside><button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><nav><button className="active">⌂ <span>Overview</span></button><button>▱ <span>Properties</span><small>3</small></button><button>⌁ <span>Analytics</span></button><button>♙ <span>Leads</span></button></nav><div className="aside-bottom"><button>⚙ <span>Settings</span></button><div className="user"><div>AM</div><span><strong>Abhi Mehta</strong><small>Professional plan</small></span><b>⋯</b></div></div></aside>
+    <aside><button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><nav><button className="active">⌂ <span>Overview</span></button><button onClick={() => onNavigate("properties")}>▱ <span>Properties</span><small>4</small></button><button>⌁ <span>Analytics</span></button><button>♙ <span>Leads</span></button></nav><div className="aside-bottom"><button>⚙ <span>Settings</span></button><div className="user"><div>AM</div><span><strong>Abhi Mehta</strong><small>MarketiX Realty</small></span><b>⋯</b></div></div></aside>
     <section className="dashboard-main">
       <header><div><p>MONDAY, 27 JULY</p><h1>Good morning, Abhi.</h1></div><button className="button coral" onClick={() => onNavigate("new")}>＋ New property</button></header>
       <div className="metrics"><article><span>TOTAL VIEWS</span><strong>1,284</strong><small className="up">↗ 18.2% this month</small></article><article><span>ACTIVE PROPERTIES</span><strong>2 <small>/ 5</small></strong><small>Starter plan allowance</small></article><article><span>WHATSAPP CLICKS</span><strong>93</strong><small className="up">↗ 12.4% this month</small></article><article className="mini-chart"><span>VIEWS THIS WEEK</span><div><i style={{height:"32%"}}/><i style={{height:"55%"}}/><i style={{height:"42%"}}/><i style={{height:"76%"}}/><i style={{height:"62%"}}/><i style={{height:"90%"}}/><i style={{height:"72%"}}/></div></article></div>
@@ -137,6 +145,65 @@ function Dashboard({ onNavigate }: { onNavigate: (s: Screen) => void }) {
       <div className="project-grid">{projects.map((p, i)=><article className="project-card" key={p.title} onClick={() => i === 0 && onNavigate("property")}><div className="project-image"><img src={p.image} alt=""/><span className={p.status === "Draft" ? "draft" : ""}>● {p.status}</span><button aria-label="More options">⋯</button></div><div className="project-info"><span>{p.place}</span><h3>{p.title}</h3><p>3 BHK · {p.price} onwards</p><div><small>◎ {p.views} views</small><small>↗ Share</small></div></div></article>)}
       <button className="add-card" onClick={() => onNavigate("new")}><span>＋</span><strong>Add another property</strong><small>2 of 5 pages used</small></button></div>
     </section>
+  </main>;
+}
+
+function PropertiesPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("All");
+  const [locationFilter, setLocationFilter] = useState("All Pune");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const filtered = propertyInventory.filter((property) => {
+    const matchesQuery = `${property.title} ${property.developer} ${property.place}`.toLowerCase().includes(query.toLowerCase());
+    const matchesStatus = status === "All" || property.status === status;
+    const matchesLocation = locationFilter === "All Pune" || property.place.startsWith(locationFilter);
+    return matchesQuery && matchesStatus && matchesLocation;
+  });
+
+  return <main className="inventory-shell">
+    <aside className="inventory-sidebar">
+      <button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button>
+      <nav>
+        <button onClick={() => onNavigate("dashboard")}>⌂ <span>Overview</span></button>
+        <button className="active">▱ <span>Properties</span></button>
+        <button>□ <span>Collections</span></button>
+        <button>♙ <span>Leads</span></button>
+        <button>⌁ <span>Analytics</span></button>
+        <button>⚙ <span>Settings</span></button>
+      </nav>
+      <div className="inventory-user"><span>AM</span><div><strong>Abhi Mehta</strong><small>MarketiX Realty</small></div></div>
+    </aside>
+    <section className="inventory-main">
+      <header className="inventory-top">
+        <div className="inventory-global-search">⌕ <input value={query} onChange={(event)=>setQuery(event.target.value)} aria-label="Search properties" placeholder="Search by project, developer or location"/></div>
+        <button className="button coral" onClick={() => onNavigate("new")}>＋ New property</button>
+      </header>
+      <div className="inventory-heading">
+        <div><span className="inventory-kicker">PROPERTY LIBRARY</span><h1>My Properties</h1><p>Manage, update and share your active property microsites.</p></div>
+        <div className="view-toggle" aria-label="Property view"><button className={view==="grid"?"active":""} onClick={()=>setView("grid")} aria-label="Grid view">▦</button><button className={view==="list"?"active":""} onClick={()=>setView("list")} aria-label="List view">☷</button></div>
+      </div>
+      <button className="mobile-filter-button" onClick={()=>setFiltersOpen(!filtersOpen)}>☷ Filters <span>{filtered.length} properties</span></button>
+      <div className={`inventory-filters ${filtersOpen?"open":""}`}>
+        <label>Status<select value={status} onChange={(event)=>setStatus(event.target.value)}><option>All</option><option>Published</option><option>Draft</option></select></label>
+        <label>Location<select value={locationFilter} onChange={(event)=>setLocationFilter(event.target.value)}><option>All Pune</option><option>Kharadi</option><option>Baner</option><option>Koregaon Park</option><option>Wakad</option></select></label>
+        <label>Property type<select><option>All configurations</option><option>2 BHK</option><option>3 BHK</option><option>4 BHK</option></select></label>
+        <button onClick={()=>{setStatus("All");setLocationFilter("All Pune");setQuery("");}}>Clear filters</button>
+      </div>
+      {view === "grid" ? <div className="inventory-grid">
+        {filtered.map((property, index)=><article className="inventory-card" key={property.title} onClick={()=>index===0&&onNavigate("property")}>
+          <div className="inventory-photo"><img src={property.image} alt={`${property.title} property`}/><span className={property.status==="Draft"?"draft":""}>● {property.status}</span><button aria-label={`More actions for ${property.title}`}>⋯</button></div>
+          <div className="inventory-card-body"><span>{property.developer}</span><h2>{property.title}</h2><p>⌖ {property.place}</p><strong>{property.price}<small> onwards</small></strong><div><span><small>VIEWS</small><b>{property.views.toLocaleString("en-IN")}</b></span><span><small>LEADS</small><b>{property.leads}</b></span><button onClick={(event)=>{event.stopPropagation();if(index===0)onNavigate("property");}}>View page ↗</button></div></div>
+        </article>)}
+        <button className="inventory-add" onClick={()=>onNavigate("new")}><span>＋</span><strong>Add a property</strong><small>Create another shareable microsite</small></button>
+      </div> : <div className="inventory-list-wrap">
+        <table className="inventory-table"><thead><tr><th>Property</th><th>Developer</th><th>Location</th><th>Status</th><th>Updated</th><th>Views</th><th>Leads</th><th></th></tr></thead><tbody>{filtered.map((property,index)=><tr key={property.title} onClick={()=>index===0&&onNavigate("property")}><td><img src={property.image} alt=""/><span><strong>{property.title}</strong><small>{property.config} · {property.price}</small></span></td><td>{property.developer}</td><td>{property.place}</td><td><span className={`table-status ${property.status==="Draft"?"draft":""}`}>● {property.status}</span></td><td>{property.updated}</td><td>{property.views.toLocaleString("en-IN")}</td><td>{property.leads}</td><td>⋯</td></tr>)}</tbody></table>
+        <div className="inventory-mobile-list">{filtered.map((property,index)=><article key={property.title} onClick={()=>index===0&&onNavigate("property")}><img src={property.image} alt=""/><div><span className={`table-status ${property.status==="Draft"?"draft":""}`}>● {property.status}</span><h2>{property.title}</h2><p>{property.place}</p><strong>{property.price}</strong></div><button aria-label={`More actions for ${property.title}`}>⋯</button></article>)}</div>
+      </div>}
+      {!filtered.length&&<div className="inventory-empty"><span>⌕</span><h2>No properties found</h2><p>Try changing your filters or search terms.</p><button className="button outline" onClick={()=>{setStatus("All");setLocationFilter("All Pune");setQuery("");}}>Clear filters</button></div>}
+    </section>
+    <nav className="inventory-bottom-nav"><button onClick={()=>onNavigate("dashboard")}>⌂<span>Overview</span></button><button className="active">▱<span>Properties</span></button><button>♙<span>Leads</span></button><button>⌁<span>Analytics</span></button><button>◎<span>Account</span></button></nav>
   </main>;
 }
 

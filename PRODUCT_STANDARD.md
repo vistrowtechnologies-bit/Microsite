@@ -108,7 +108,9 @@ microsite or listing generator:
 - Every interaction works with touch, keyboard and screen readers.
 - Target fast first display on ordinary Indian mobile networks.
 
-## Approved light colour direction
+## Approved light colour direction — locked
+
+Selected direction: **01 · Cobalt + Orange**
 
 - Primary background: `#FFFFFF`
 - Secondary background: `#F7F8FA`

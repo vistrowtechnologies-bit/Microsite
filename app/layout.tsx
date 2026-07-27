@@ -8,13 +8,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Nestory — Every property. One beautiful link.",
     description: "Beautiful, shareable property pages for brokers and channel partners.",
-    images: ["/og.png"],
+    images: ["/og-cobalt.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Nestory — Every property. One beautiful link.",
     description: "Beautiful, shareable property pages for brokers and channel partners.",
-    images: ["/og.png"],
+    images: ["/og-cobalt.png"],
   },
   icons: {
     icon: "/favicon.svg",

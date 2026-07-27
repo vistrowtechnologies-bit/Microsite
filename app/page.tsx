@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 
 type Screen = "home" | "dashboard" | "property" | "new";
 
@@ -141,6 +142,37 @@ function Dashboard({ onNavigate }: { onNavigate: (s: Screen) => void }) {
 
 function PropertyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [saved, setSaved] = useState(false);
+  const [downPayment, setDownPayment] = useState(30);
+  const [interestRate, setInterestRate] = useState(8.5);
+  const [tenure, setTenure] = useState(20);
+  const qrRef = useRef<HTMLCanvasElement>(null);
+  const propertyPrice = 14800000;
+  const loanAmount = Math.max(propertyPrice - downPayment * 100000, 0);
+  const monthlyRate = interestRate / 1200;
+  const months = tenure * 12;
+  const monthlyEmi = monthlyRate
+    ? loanAmount * monthlyRate * Math.pow(1 + monthlyRate, months) / (Math.pow(1 + monthlyRate, months) - 1)
+    : loanAmount / months;
+  const totalPayment = monthlyEmi * months;
+  const formatMoney = (value: number) => `₹${Math.round(value).toLocaleString("en-IN")}`;
+
+  useEffect(() => {
+    if (!qrRef.current) return;
+    QRCode.toCanvas(qrRef.current, window.location.href, {
+      width: 144,
+      margin: 1,
+      color: { dark: "#172033", light: "#FFFFFF" },
+    });
+  }, []);
+
+  const downloadQr = () => {
+    if (!qrRef.current) return;
+    const link = document.createElement("a");
+    link.download = "verdant-heights-qr.png";
+    link.href = qrRef.current.toDataURL("image/png");
+    link.click();
+  };
+
   return <main className="property-page">
     <nav className="property-nav"><button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><div><button onClick={() => navigator.clipboard?.writeText(location.href)}>↗ Share</button><button onClick={() => setSaved(!saved)}>{saved ? "♥ Saved" : "♡ Save"}</button></div></nav>
     <section className="gallery">{photos.map((p,i)=><img key={p} src={p} alt={`Verdant Heights property view ${i+1}`}/>) }<span className="photo-count">▦ Show all 18 photos</span></section>
@@ -148,6 +180,21 @@ function PropertyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
       <div className="property-detail"><span className="tag">NEW LAUNCH · POSSESSION 2028</span><h1>Verdant Heights</h1><p className="location">Kharadi, Pune <span>·</span> by Aurum Developers</p><div className="fact-row"><div><strong>3 & 4</strong><span>BHK HOMES</span></div><div><strong>1,246–1,890</strong><span>SQ. FT.</span></div><div><strong>28</strong><span>STOREYS</span></div><div><strong>Dec ’28</strong><span>POSSESSION</span></div></div>
       <article className="about"><span>ABOUT THE PROJECT</span><h2>Space to slow down.<br/>City life, close by.</h2><p>Verdant Heights brings generous, light-filled homes to the heart of Kharadi. Three thoughtfully planned towers sit within 5 acres of landscaped calm, minutes from EON IT Park and Pune’s best social infrastructure.</p></article>
       <article className="amenities"><span>EVERYDAY AMENITIES</span><div><p>◌ Infinity pool</p><p>♧ Landscaped gardens</p><p>♙ Fitness studio</p><p>⌂ Residents’ lounge</p><p>◇ Children’s play area</p><p>⌁ 24/7 security</p></div></article>
+      <article className="emi-calculator">
+        <span>PLAN YOUR PURCHASE</span>
+        <div className="emi-heading"><div><h2>Estimate your monthly EMI</h2><p>Adjust the details to explore an indicative home-loan estimate.</p></div><div className="emi-result"><small>ESTIMATED EMI</small><strong>{formatMoney(monthlyEmi)}<i>/month</i></strong></div></div>
+        <div className="emi-controls">
+          <label><span>Down payment <b>₹{downPayment}L</b></span><input type="range" min="15" max="100" step="1" value={downPayment} onChange={(e)=>setDownPayment(Number(e.target.value))}/></label>
+          <label><span>Interest rate <b>{interestRate}%</b></span><input type="range" min="6" max="14" step=".1" value={interestRate} onChange={(e)=>setInterestRate(Number(e.target.value))}/></label>
+          <label><span>Loan tenure <b>{tenure} years</b></span><input type="range" min="5" max="30" step="1" value={tenure} onChange={(e)=>setTenure(Number(e.target.value))}/></label>
+        </div>
+        <div className="emi-breakdown"><span><small>LOAN AMOUNT</small><strong>{formatMoney(loanAmount)}</strong></span><span><small>TOTAL INTEREST</small><strong>{formatMoney(Math.max(totalPayment-loanAmount,0))}</strong></span><span><small>TOTAL REPAYMENT</small><strong>{formatMoney(totalPayment)}</strong></span></div>
+        <p className="emi-disclaimer">Indicative estimate only. Final rates, eligibility and repayment terms are determined by the lender.</p>
+      </article>
+      <article className="qr-share">
+        <div><span>SHARE IN PERSON</span><h2>Take this property with you.</h2><p>Scan to open this page on another phone, or download the QR code for a brochure, desk card or site event.</p><button className="button outline" onClick={downloadQr}>↓ Download QR code</button></div>
+        <div className="qr-frame"><canvas ref={qrRef} aria-label="QR code for the Verdant Heights property page"/><small>SCAN TO VIEW</small></div>
+      </article>
       <article className="documents"><span>PROJECT DOCUMENTS</span><div><span className="doc-icon">PDF</span><div><strong>Verdant Heights — Brochure</strong><small>12.4 MB · Updated July 2026</small></div><button>↓ Download</button></div><div><span className="doc-icon">PDF</span><div><strong>Floor plans & price sheet</strong><small>4.8 MB · Updated July 2026</small></div><button>↓ Download</button></div></article>
       </div>
       <aside className="contact-card"><span>Homes from</span><h2>₹1.48 Cr*</h2><p>Inclusive of base price</p><hr/><div className="agent"><div>AM</div><span><small>LISTED BY</small><strong>Abhi Mehta</strong><p>MarketiX Realty · RERA verified</p></span></div><a className="button whatsapp" href="https://wa.me/919876543210?text=Hi%20Abhi%2C%20I%27m%20interested%20in%20Verdant%20Heights">◉ Chat on WhatsApp</a><a className="call" href="tel:+919876543210">⌕ Call Abhi</a><small className="response">Usually responds within 10 minutes</small></aside>

@@ -25,6 +25,7 @@ const Arrow = () => <span aria-hidden="true">↗</span>;
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [menu, setMenu] = useState(false);
+  const [demoStep, setDemoStep] = useState(0);
 
   const navigate = (next: Screen) => {
     setScreen(next);
@@ -60,7 +61,7 @@ export default function Home() {
           <button className="text-button" onClick={() => navigate("login")}>Log in</button>
           <button className="button dark small" onClick={() => navigate("signup")}>Start free <Arrow /></button>
         </div>
-        <button className="menu-button" onClick={() => setMenu(!menu)} aria-label="Toggle menu">☰</button>
+        <button className="menu-button" onClick={() => setMenu(!menu)} aria-label="Toggle menu" aria-expanded={menu}>{menu ? "×" : "☰"}</button>
       </nav>
 
       <section className="hero">
@@ -79,7 +80,7 @@ export default function Home() {
         <div className="browser-mock">
           <div className="browser-bar"><div className="dots"><b/><b/><b/></div><div className="address">nestory.in/p/verdant-heights</div><span>⋯</span></div>
           <div className="listing-preview">
-            <div className="preview-nav"><span className="mini-brand">nestory</span><span>♡ &nbsp; Share</span></div>
+            <div className="preview-nav"><span className="broker-brand"><span className="broker-mark small">MR</span><b>MarketiX Realty</b></span><span>♡ &nbsp; Share</span></div>
             <div className="preview-grid">
               <img src={photos[0]} alt="Verdant Heights living room"/>
               <img src={photos[1]} alt="Modern dining area"/>
@@ -97,11 +98,13 @@ export default function Home() {
 
       <section className="transformation" aria-label="From developer files to finished microsite">
         <div className="section-heading compact"><span className="section-number">01 / ONE-SHOT IMPORT</span><h2>Everything they send you.<br/><em>Organised automatically.</em></h2></div>
-        <div className="transform-grid">
+        <div className="transform-controls" role="tablist" aria-label="AI transformation stages">{["1. Upload everything","2. AI organises","3. Review & share"].map((label,index)=><button role="tab" aria-selected={demoStep===index} className={demoStep===index?"active":""} key={label} onClick={()=>setDemoStep(index)}>{label}</button>)}</div>
+        <div className={`transform-grid step-${demoStep}`}>
           <article className="input-stack"><span>YOUR INPUTS</span><div><b>PDF</b><p>Project brochure</p><small>42 pages</small></div><div><b>XLS</b><p>July price sheet</p><small>8 configurations</small></div><div><b>IMG</b><p>Photos & floor plans</p><small>28 files</small></div><div><b>TXT</b><p>Developer WhatsApp notes</p><small>Pasted text</small></div></article>
           <article className="ai-engine"><span className="ai-spark">✦</span><strong>Nestory AI</strong><p>Reads, compares and structures every source.</p><ul><li>✓ 24 facts found</li><li>✓ 18 photos sorted</li><li>✓ 4 floor plans matched</li><li>! 2 items need review</li></ul></article>
-          <article className="output-phone"><div className="phone-top"><span>9:41</span><span>● ● ●</span></div><img src={photos[0]} alt="Generated Verdant Heights property page"/><div><small>NEW LAUNCH · RERA VERIFIED</small><h3>Verdant Heights</h3><p>Kharadi, Pune</p><strong>₹1.48 Cr onwards</strong><button onClick={() => navigate("property")}>View generated page ↗</button></div></article>
+          <article className="output-phone"><div className="phone-top"><span>9:41</span><span>● ● ●</span></div><div className="phone-broker"><span className="broker-mark small">MR</span><b>MarketiX Realty</b></div><img src={photos[0]} alt="Generated Verdant Heights property page"/><div><small>NEW LAUNCH · RERA VERIFIED</small><h3>Verdant Heights</h3><p>Kharadi, Pune</p><strong>₹1.48 Cr onwards</strong><button onClick={() => navigate("property")}>View generated page ↗</button></div></article>
         </div>
+        <button className="transform-next" onClick={()=>setDemoStep((demoStep+1)%3)}>{demoStep===2?"Replay transformation":"Next step"} <Arrow /></button>
       </section>
 
       <section className="problem">
@@ -143,8 +146,13 @@ export default function Home() {
         <div className="source-card"><span>SOURCE CHECK</span><h3>Starting price</h3><strong>₹1.48 Cr</strong><p>Found in <b>PriceList_July.pdf</b> · Page 2</p><div><span>96% confidence</span><button>✓ Confirmed</button></div></div>
       </section>
 
+      <section className="marketing-faq">
+        <div><span className="section-number">07 / QUESTIONS, ANSWERED</span><h2>Before you upload.</h2><p>Your source files remain private and no property page goes live until you approve it.</p></div>
+        <div>{[["What can I upload?","PDF brochures, price sheets, DOCX or XLSX files, JPG/PNG/WebP images, ZIP folders and copied WhatsApp or email text."],["Will AI publish incorrect information?","No. Nestory creates a draft. Low-confidence and conflicting facts are flagged with their source so the broker can confirm them before publishing."],["Whose branding appears on the microsite?","The broker or channel partner’s logo, firm name, RERA details and contact actions. Nestory branding is not shown to the buyer."],["Can I update a shared project later?","Yes. Update the master project once and the same previously shared link shows the latest approved information."]].map(([question,answer])=><details key={question}><summary>{question}<span>＋</span></summary><p>{answer}</p></details>)}</div>
+      </section>
+
       <section className="pricing" id="pricing">
-        <span className="section-number">07 / SIMPLE PRICING</span>
+        <span className="section-number">08 / SIMPLE PRICING</span>
         <h2>Start small. <em>Share big.</em></h2>
         <p>Everything you need to make a sharper first impression.</p>
         <div className="price-cards">
@@ -153,6 +161,7 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="marketing-mobile-cta"><button className="button coral" onClick={()=>navigate("signup")}>Create with AI <Arrow /></button></div>
       <footer><div className="footer-brand"><span className="brand-mark">N</span><strong>nestory</strong><p>Upload everything once. Share one beautiful link.</p></div><div><span>PRODUCT</span><a href="#features">Features</a><a href="#pricing">Pricing</a><button onClick={() => navigate("property")}>Live example</button></div><div><span>COMPANY</span><a href="#how">About</a><a href="mailto:hello@nestory.in">Contact</a><a href="#">Privacy</a></div><div className="footer-cta"><p>Ready to turn files into a microsite?</p><button className="button cream" onClick={() => navigate("signup")}>Create with AI <Arrow /></button></div></footer>
     </main>
   );
@@ -337,7 +346,7 @@ function ReviewPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
 
 function PreviewPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [device, setDevice] = useState<"mobile"|"desktop">("mobile");
-  return <main className="preview-shell"><header><button className="brand" onClick={()=>onNavigate("review")}><span className="brand-mark">N</span><span>nestory</span></button><div className="device-toggle"><button className={device==="mobile"?"active":""} onClick={()=>setDevice("mobile")}>▯ Mobile</button><button className={device==="desktop"?"active":""} onClick={()=>setDevice("desktop")}>▰ Desktop</button></div><div><button className="button outline" onClick={()=>onNavigate("review")}>Continue editing</button><button className="button coral" onClick={()=>onNavigate("property")}>Publish page <Arrow /></button></div></header><section className={`preview-canvas ${device}`}><div className="preview-browser"><div className="preview-browser-bar"><span>● ● ●</span><b>nestory.in/p/verdant-heights</b><span>↗</span></div><div className="preview-site"><img src={photos[0]} alt="Verdant Heights preview"/><div><span>NEW LAUNCH · RERA VERIFIED</span><h1>Verdant Heights</h1><p>Kharadi, Pune · by Aurum Developers</p><section><strong>3 & 4 BHK</strong><strong>₹1.48 Cr onwards</strong></section><button onClick={()=>onNavigate("property")}>View complete preview</button></div></div></div></section></main>;
+  return <main className="preview-shell"><header><button className="brand" onClick={()=>onNavigate("review")}><span className="brand-mark">N</span><span>nestory</span></button><div className="device-toggle"><button className={device==="mobile"?"active":""} onClick={()=>setDevice("mobile")}>▯ Mobile</button><button className={device==="desktop"?"active":""} onClick={()=>setDevice("desktop")}>▰ Desktop</button></div><div><button className="button outline" onClick={()=>onNavigate("review")}>Continue editing</button><button className="button coral" onClick={()=>onNavigate("property")}>Publish page <Arrow /></button></div></header><section className={`preview-canvas ${device}`}><div className="preview-browser"><div className="preview-browser-bar"><span>● ● ●</span><b>your-property-link/p/verdant-heights</b><span>↗</span></div><div className="preview-site"><div className="preview-broker-bar"><span className="broker-mark small">MR</span><strong>MarketiX Realty</strong><small>RERA verified</small></div><img src={photos[0]} alt="Verdant Heights preview"/><div><span>NEW LAUNCH · RERA VERIFIED</span><h1>Verdant Heights</h1><p>Kharadi, Pune · by Aurum Developers</p><section><strong>3 & 4 BHK</strong><strong>₹1.48 Cr onwards</strong></section><button onClick={()=>onNavigate("property")}>View complete preview</button></div></div></div></section></main>;
 }
 
 function PropertyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
@@ -375,7 +384,7 @@ function PropertyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   };
 
   return <main className="property-page">
-    <nav className="property-nav"><button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><div><button onClick={() => navigator.clipboard?.writeText(location.href)}>↗ Share</button><button onClick={() => setSaved(!saved)}>{saved ? "♥ Saved" : "♡ Save"}</button></div></nav>
+    <nav className="property-nav"><div className="broker-brand" aria-label="Listed by MarketiX Realty"><span className="broker-mark">MR</span><span><strong>MarketiX Realty</strong><small>RERA verified broker</small></span></div><div><button onClick={() => navigator.clipboard?.writeText(location.href)}>↗ Share</button><button onClick={() => setSaved(!saved)}>{saved ? "♥ Saved" : "♡ Save"}</button></div></nav>
     <section className="gallery">{photos.map((p,i)=><img key={p} src={p} alt={`Verdant Heights property view ${i+1}`}/>) }<span className="photo-count">▦ Show all 18 photos</span></section>
     <section className="property-content">
       <div className="property-detail"><span className="tag">NEW LAUNCH · RERA VERIFIED · POSSESSION 2028</span><h1>Verdant Heights</h1><p className="location">Kharadi, Pune <span>·</span> by Aurum Developers</p><div className="fact-row"><div><strong>3 & 4</strong><span>BHK HOMES</span></div><div><strong>1,246–1,890</strong><span>SQ. FT.</span></div><div><strong>28</strong><span>STOREYS</span></div><div><strong>Dec ’28</strong><span>POSSESSION</span></div></div>
@@ -406,7 +415,7 @@ function PropertyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
       <aside className="contact-card"><span>Homes from</span><h2>₹1.48 Cr*</h2><p>Indicative agreement value</p><hr/><div className="agent"><div>AM</div><span><small>LISTED BY</small><strong>Abhi Mehta</strong><p>MarketiX Realty · RERA verified</p></span></div><a className="button whatsapp" href="https://wa.me/919876543210?text=Hi%20Abhi%2C%20I%27m%20interested%20in%20Verdant%20Heights">◉ Chat on WhatsApp</a><button className="button site-visit" onClick={()=>setVisitOpen(!visitOpen)}>⌂ Schedule site visit</button><a className="call" href="tel:+919876543210">⌕ Call Abhi</a>{visitOpen&&<form className="visit-form" onSubmit={(event)=>{event.preventDefault();setVisitOpen(false);}}><label>Preferred date<input type="date" required/></label><label>Your name<input required placeholder="Full name"/></label><button type="submit">Request visit</button></form>}<small className="response">Usually responds within 10 minutes</small></aside>
     </section>
     <div className="mobile-contact"><div><span>Homes from</span><strong>₹1.48 Cr*</strong></div><a href="https://wa.me/919876543210">WhatsApp Abhi</a></div>
-    <footer className="property-footer"><button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><p>This property page was prepared by Abhi Mehta. Prices are indicative and subject to change.</p></footer>
+    <footer className="property-footer"><div className="broker-brand"><span className="broker-mark">MR</span><span><strong>MarketiX Realty</strong><small>Presented by Abhi Mehta</small></span></div><p>This property page was prepared by Abhi Mehta. Prices are indicative and subject to change.</p></footer>
   </main>;
 }
 

@@ -5,18 +5,18 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://nestory.in"),
-  title: "Nestory — Every property. One beautiful link.",
-  description: "Create beautiful, shareable property pages for your clients. Built for brokers and channel partners in India.",
+  title: "Nestory AI — Upload everything once. Share one beautiful link.",
+  description: "Turn developer brochures, price sheets, floor plans, photos and text into a premium property microsite for your clients.",
   openGraph: {
-    title: "Nestory — Every property. One beautiful link.",
-    description: "Beautiful, shareable property pages for brokers and channel partners.",
-    images: ["/og-cobalt.png"],
+    title: "Nestory AI — Upload everything once. Share one beautiful link.",
+    description: "AI-generated, source-backed property microsites for brokers and channel partners.",
+    images: ["/og-ai.png"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nestory — Every property. One beautiful link.",
-    description: "Beautiful, shareable property pages for brokers and channel partners.",
-    images: ["/og-cobalt.png"],
+    title: "Nestory AI — Upload everything once. Share one beautiful link.",
+    description: "AI-generated, source-backed property microsites for brokers and channel partners.",
+    images: ["/og-ai.png"],
   },
   icons: {
     icon: "/favicon.svg",

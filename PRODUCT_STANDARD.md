@@ -51,7 +51,9 @@ install the Nestory app.
 8. Video walkthrough and optional 360-degree tour.
 9. Downloadable brochure, price sheet and RERA documents.
 10. Similar or shortlisted projects from the same broker.
-11. Clear enquiry, callback and site-visit actions.
+11. EMI calculator with editable down payment, interest rate and tenure.
+12. Project QR code for print, events and in-person sharing.
+13. Clear enquiry, callback and site-visit actions.
 
 ## Differentiators
 
@@ -76,6 +78,12 @@ microsite or listing generator:
   or uploads when connectivity is weak.
 - **Share preview control:** broker can preview and choose the WhatsApp title,
   image and short description before sharing.
+- **Dynamic QR sharing:** every public or personalised link has a downloadable
+  QR code. Scans use the same attribution and analytics pipeline as direct link
+  visits.
+- **Transparent EMI calculator:** buyer can adjust price, down payment, interest
+  rate and tenure. Results show monthly EMI, principal, estimated interest and
+  total repayment with a clear indicative-only disclaimer.
 - **Regional presentation:** English, Hindi and Marathi content can be switched
   per link while preserving one source property.
 - **Mobile document intelligence:** photograph or upload a brochure/price list,
@@ -86,6 +94,11 @@ microsite or listing generator:
 ## Airbnb-style design rules
 
 - Photography leads; interface chrome recedes.
+- The default product theme is light: white primary backgrounds, warm-white
+  secondary sections, dark high-contrast text and carefully controlled bold
+  accents.
+- Bold colour is concentrated in CTAs, key facts, interactive tools and
+  occasional branded sections. Reading areas remain white and calm.
 - Generous whitespace, editorial hierarchy and calm transitions.
 - One primary action per section.
 - Important facts are scannable without reading paragraphs.
@@ -94,6 +107,37 @@ microsite or listing generator:
 - Contact actions remain available but never feel aggressive.
 - Every interaction works with touch, keyboard and screen readers.
 - Target fast first display on ordinary Indian mobile networks.
+
+## Approved light colour direction
+
+- Primary background: `#FFFFFF`
+- Secondary background: `#F7F8FA`
+- Primary text: `#172033`
+- Primary accent: `#175CD3` — links, active controls and primary actions
+- Warm accent: `#F97316` — price highlights and selective attention moments
+- Success/WhatsApp: `#168B67`
+- Borders: `#E4E7EC`
+- Display type: Fraunces
+- Interface/body type: Manrope
+- Numeric/data type: Space Grotesk
+
+The orange accent must never compete with the main blue action on the same
+screen. WhatsApp green is semantic, not decorative.
+
+## Mobile-first rules
+
+- Design and test the 360–390 px layout before tablet and desktop.
+- Gallery, facts, floor plans, calculator and contact actions must be usable
+  with one thumb.
+- Sticky mobile CTA respects safe areas and never covers content.
+- Tap targets are at least 44 × 44 px.
+- No horizontal page scrolling or desktop-only hover interactions.
+- Floor plans support pinch-to-zoom and a full-screen view.
+- Forms use appropriate mobile keyboards and native pickers.
+- QR codes are share/download actions on mobile; scanning is mainly for
+  desktop, print and in-person contexts.
+- Images use responsive sizes, lazy loading and lightweight placeholders.
+- The essential microsite remains useful under slow or interrupted connectivity.
 
 ## Shared architecture
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { completeBrokerOnboarding, hasOrganizationMembership, sendEmailOtp, verifyEmailOtp } from "./lib/supabase/auth";
+import { isSupabaseConfigured } from "./lib/supabase/client";
 
 type Screen = "home" | "login" | "signup" | "verify" | "onboarding" | "dashboard" | "properties" | "property" | "new" | "ai-upload" | "processing" | "review" | "preview";
 
@@ -26,6 +28,7 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [menu, setMenu] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
+  const [authEmail, setAuthEmail] = useState("abhi@prophuntllp.com");
 
   const navigate = (next: Screen) => {
     setScreen(next);
@@ -37,9 +40,9 @@ export default function Home() {
   if (screen === "properties") return <PropertiesPage onNavigate={navigate} />;
   if (screen === "property") return <PropertyPage onNavigate={navigate} />;
   if (screen === "new") return <NewProperty onNavigate={navigate} />;
-  if (screen === "login") return <AuthPage mode="login" onNavigate={navigate} />;
-  if (screen === "signup") return <AuthPage mode="signup" onNavigate={navigate} />;
-  if (screen === "verify") return <VerifyPage onNavigate={navigate} />;
+  if (screen === "login") return <AuthPage mode="login" onNavigate={navigate} onEmail={setAuthEmail} />;
+  if (screen === "signup") return <AuthPage mode="signup" onNavigate={navigate} onEmail={setAuthEmail} />;
+  if (screen === "verify") return <VerifyPage email={authEmail} onNavigate={navigate} />;
   if (screen === "onboarding") return <OnboardingPage onNavigate={navigate} />;
   if (screen === "ai-upload") return <AiUploadPage onNavigate={navigate} />;
   if (screen === "processing") return <ProcessingPage onNavigate={navigate} />;
@@ -256,8 +259,25 @@ function PropertiesPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   </main>;
 }
 
-function AuthPage({ mode, onNavigate }: { mode: "login" | "signup"; onNavigate: (s: Screen) => void }) {
+function AuthPage({ mode, onNavigate, onEmail }: { mode: "login" | "signup"; onNavigate: (s: Screen) => void; onEmail: (email: string) => void }) {
   const signup = mode === "signup";
+  const [email, setEmail] = useState("abhi@prophuntllp.com");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (isSupabaseConfigured) await sendEmailOtp(email, signup);
+      onEmail(email);
+      onNavigate("verify");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "We could not send the OTP.");
+    } finally {
+      setLoading(false);
+    }
+  };
   return <main className="auth-shell">
     <section className="auth-story">
       <button className="brand light-brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button>
@@ -269,11 +289,13 @@ function AuthPage({ mode, onNavigate }: { mode: "login" | "signup"; onNavigate: 
         <span className="auth-kicker">{signup ? "CREATE YOUR WORKSPACE" : "WELCOME BACK"}</span>
         <h1>{signup ? "Start sharing smarter." : "Log in to Nestory."}</h1>
         <p>{signup ? "Create your broker workspace in less than a minute." : "Access your properties, leads and share links."}</p>
-        <form onSubmit={(event)=>{event.preventDefault();onNavigate("verify");}}>
+        {!isSupabaseConfigured&&<div className="auth-setup-note"><span>DEMO MODE</span><p>Connect Supabase to activate secure email OTP accounts. The current flow remains available for product review.</p></div>}
+        <form onSubmit={submit}>
           {signup&&<label>Full name<input required defaultValue="Abhi Mehta" placeholder="Your name"/></label>}
-          <label>Mobile number<div className="phone-input"><span>🇮🇳 +91</span><input required inputMode="tel" defaultValue="98765 43210" aria-label="Mobile number"/></div></label>
-          {signup&&<label>Work email <small>Optional</small><input type="email" placeholder="you@company.com"/></label>}
-          <button className="button coral" type="submit">{signup ? "Create account" : "Send login OTP"} <Arrow /></button>
+          <label>Work email<input required type="email" value={email} onChange={(event)=>setEmail(event.target.value)} placeholder="you@company.com"/></label>
+          {signup&&<label>Mobile number <small>Used on buyer pages</small><div className="phone-input"><span>🇮🇳 +91</span><input required inputMode="tel" defaultValue="98765 43210" aria-label="Mobile number"/></div></label>}
+          {error&&<p className="auth-error" role="alert">{error}</p>}
+          <button className="button coral" type="submit" disabled={loading}>{loading ? "Sending secure OTP…" : signup ? "Create account" : "Send login OTP"} {!loading&&<Arrow />}</button>
         </form>
         <div className="auth-switch">{signup ? "Already have an account?" : "New to Nestory?"}<button onClick={()=>onNavigate(signup?"login":"signup")}>{signup ? "Log in" : "Create account"}</button></div>
         <small className="legal-copy">By continuing, you agree to Nestory’s Terms and Privacy Policy.</small>
@@ -282,28 +304,77 @@ function AuthPage({ mode, onNavigate }: { mode: "login" | "signup"; onNavigate: 
   </main>;
 }
 
-function VerifyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [code, setCode] = useState(["2","4","8","6"]);
+function VerifyPage({ email, onNavigate }: { email: string; onNavigate: (s: Screen) => void }) {
+  const [code, setCode] = useState(isSupabaseConfigured ? ["","","","","",""] : ["2","4","8","6","1","9"]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const verify = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      if (isSupabaseConfigured) {
+        await verifyEmailOtp(email, code.join(""));
+        onNavigate(await hasOrganizationMembership() ? "dashboard" : "onboarding");
+      } else {
+        onNavigate("onboarding");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The OTP is invalid or expired.");
+    } finally {
+      setLoading(false);
+    }
+  };
   return <main className="simple-flow">
     <header><button className="brand" onClick={()=>onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><button onClick={()=>onNavigate("login")}>← Back</button></header>
-    <section className="verify-card"><span className="flow-icon">✉</span><span className="auth-kicker">VERIFY YOUR NUMBER</span><h1>Enter the code we sent.</h1><p>A 4-digit OTP was sent to +91 98765 43210.</p><div className="otp-row">{code.map((digit,index)=><input key={index} inputMode="numeric" maxLength={1} value={digit} aria-label={`OTP digit ${index+1}`} onChange={(event)=>{const next=[...code];next[index]=event.target.value;setCode(next);}}/>)}</div><button className="button coral" onClick={()=>onNavigate("onboarding")}>Verify & continue <Arrow /></button><button className="resend">Resend code in 00:24</button></section>
+    <section className="verify-card"><span className="flow-icon">✉</span><span className="auth-kicker">VERIFY YOUR EMAIL</span><h1>Enter the code we sent.</h1><p>A 6-digit OTP was sent to {email}.</p><div className="otp-row">{code.map((digit,index)=><input key={index} inputMode="numeric" maxLength={1} value={digit} aria-label={`OTP digit ${index+1}`} onChange={(event)=>{const next=[...code];next[index]=event.target.value.replace(/\D/g,"");setCode(next);}}/>)}</div>{error&&<p className="auth-error" role="alert">{error}</p>}<button className="button coral" disabled={loading||code.some(digit=>!digit)} onClick={verify}>{loading?"Verifying…":"Verify & continue"} {!loading&&<Arrow />}</button><button className="resend" onClick={()=>isSupabaseConfigured&&sendEmailOtp(email,true)}>Resend code</button></section>
   </main>;
 }
 
 function OnboardingPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [step, setStep] = useState(1);
   const [role, setRole] = useState("Channel partner");
+  const [organizationName, setOrganizationName] = useState("Prophunt LLP");
+  const [city, setCity] = useState("Pune");
+  const [fullName, setFullName] = useState("Abhi Mehta");
+  const [reraNumber, setReraNumber] = useState("A52100012345");
+  const [phone, setPhone] = useState("+91 98765 43210");
+  const [language, setLanguage] = useState("English");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const titles = ["How do you work?","Tell us about your business.","Build your public identity.","Set your sharing defaults.","You’re ready to create."];
+  const finishOnboarding = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      if (isSupabaseConfigured) {
+        await completeBrokerOnboarding({
+          organizationName,
+          role,
+          fullName,
+          phone,
+          city,
+          reraNumber,
+          defaultLanguage: language,
+        });
+      }
+      onNavigate("ai-upload");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "We could not create your workspace.");
+    } finally {
+      setSaving(false);
+    }
+  };
   return <main className="onboarding-shell">
     <aside><button className="brand" onClick={()=>onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><div><span>SETUP PROGRESS</span><strong>{step} of 5</strong><div className="onboarding-progress"><i style={{width:`${step*20}%`}}/></div></div><p>We use these details to brand every microsite and contact action automatically.</p></aside>
     <section className="onboarding-main">
       <div className="onboarding-card"><span className="auth-kicker">STEP {step} OF 5</span><h1>{titles[step-1]}</h1>
         {step===1&&<><p>Choose the option that best describes your business.</p><div className="choice-grid">{["Independent broker","Channel partner","Brokerage or team"].map((item)=><button key={item} className={role===item?"selected":""} onClick={()=>setRole(item)}><span>{item==="Independent broker"?"◎":item==="Channel partner"?"⌂":"♙"}</span><strong>{item}</strong><small>{item==="Independent broker"?"I market a focused set of properties.":item==="Channel partner"?"I manage projects across developers.":"Multiple people manage one portfolio."}</small></button>)}</div></>}
-        {step===2&&<><p>This appears in your workspace and broker profile.</p><label>Business name<input defaultValue="Prophunt LLP"/></label><div className="form-row"><label>Primary city<input defaultValue="Pune"/></label><label>Projects managed<select defaultValue="10–25"><option>1–5</option><option>5–10</option><option>10–25</option><option>25+</option></select></label></div></>}
-        {step===3&&<><p>Buyers will see these details on every property page.</p><div className="profile-upload"><span>AM</span><button>Upload profile photo</button></div><label>Public display name<input defaultValue="Abhi Mehta"/></label><label>RERA registration<input defaultValue="A52100012345"/></label><label>WhatsApp number<input defaultValue="+91 98765 43210"/></label></>}
-        {step===4&&<><p>These defaults can be changed for any project or client link.</p><label>Default share message<textarea defaultValue="Hi, sharing the complete project details in one link. Let me know if you would like to schedule a site visit."/></label><div className="form-row"><label>Primary language<select><option>English</option><option>Hindi</option><option>Marathi</option></select></label><label>Buyer CTA<select><option>WhatsApp first</option><option>Call first</option><option>Book site visit</option></select></label></div></>}
-        {step===5&&<div className="onboarding-ready"><span>✓</span><h2>Your broker workspace is ready.</h2><p>Next, upload one complete developer package and Nestory will build the first draft for you.</p><ul><li>✓ Prophunt LLP branding</li><li>✓ RERA profile added</li><li>✓ WhatsApp actions configured</li></ul></div>}
-        <div className="onboarding-actions">{step>1?<button className="button outline" onClick={()=>setStep(step-1)}>← Back</button>:<span/>}<button className="button coral" onClick={()=>step<5?setStep(step+1):onNavigate("ai-upload")}>{step===5?"Create my first project":"Continue"} <Arrow /></button></div>
+        {step===2&&<><p>This appears in your workspace and broker profile.</p><label>Business name<input value={organizationName} onChange={(event)=>setOrganizationName(event.target.value)}/></label><div className="form-row"><label>Primary city<input value={city} onChange={(event)=>setCity(event.target.value)}/></label><label>Projects managed<select defaultValue="10–25"><option>1–5</option><option>5–10</option><option>10–25</option><option>25+</option></select></label></div></>}
+        {step===3&&<><p>Buyers will see these details on every property page.</p><div className="profile-upload"><span>AM</span><button>Upload profile photo</button></div><label>Public display name<input value={fullName} onChange={(event)=>setFullName(event.target.value)}/></label><label>RERA registration<input value={reraNumber} onChange={(event)=>setReraNumber(event.target.value)}/></label><label>WhatsApp number<input value={phone} onChange={(event)=>setPhone(event.target.value)}/></label></>}
+        {step===4&&<><p>These defaults can be changed for any project or client link.</p><label>Default share message<textarea defaultValue="Hi, sharing the complete project details in one link. Let me know if you would like to schedule a site visit."/></label><div className="form-row"><label>Primary language<select value={language} onChange={(event)=>setLanguage(event.target.value)}><option>English</option><option>Hindi</option><option>Marathi</option></select></label><label>Buyer CTA<select><option>WhatsApp first</option><option>Call first</option><option>Book site visit</option></select></label></div></>}
+        {step===5&&<div className="onboarding-ready"><span>✓</span><h2>Your broker workspace is ready.</h2><p>Next, upload one complete developer package and Nestory will build the first draft for you.</p><ul><li>✓ {organizationName} branding</li><li>✓ RERA profile added</li><li>✓ WhatsApp actions configured</li><li>✓ Tenant-isolated workspace</li></ul></div>}
+        {error&&<p className="auth-error" role="alert">{error}</p>}
+        <div className="onboarding-actions">{step>1?<button className="button outline" onClick={()=>setStep(step-1)}>← Back</button>:<span/>}<button className="button coral" disabled={saving} onClick={()=>step<5?setStep(step+1):finishOnboarding()}>{saving?"Creating secure workspace…":step===5?"Create my first project":"Continue"} {!saving&&<Arrow />}</button></div>
       </div>
     </section>
   </main>;

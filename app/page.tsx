@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { completeBrokerOnboarding, hasOrganizationMembership, sendEmailOtp, verifyEmailOtp } from "./lib/supabase/auth";
 import { isSupabaseConfigured } from "./lib/supabase/client";
+import { createPropertyImport, getPropertyImportStatus, listProperties, type ImportStatus, type PropertySummary } from "./lib/supabase/properties";
 
 type Screen = "home" | "login" | "signup" | "verify" | "onboarding" | "dashboard" | "properties" | "property" | "new" | "ai-upload" | "processing" | "review" | "preview";
 
@@ -29,6 +30,7 @@ export default function Home() {
   const [menu, setMenu] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
   const [authEmail, setAuthEmail] = useState("abhi@prophuntllp.com");
+  const [activeImportId, setActiveImportId] = useState<string | null>(null);
 
   const navigate = (next: Screen) => {
     setScreen(next);
@@ -44,8 +46,8 @@ export default function Home() {
   if (screen === "signup") return <AuthPage mode="signup" onNavigate={navigate} onEmail={setAuthEmail} />;
   if (screen === "verify") return <VerifyPage email={authEmail} onNavigate={navigate} />;
   if (screen === "onboarding") return <OnboardingPage onNavigate={navigate} />;
-  if (screen === "ai-upload") return <AiUploadPage onNavigate={navigate} />;
-  if (screen === "processing") return <ProcessingPage onNavigate={navigate} />;
+  if (screen === "ai-upload") return <AiUploadPage onNavigate={navigate} onImportCreated={setActiveImportId} />;
+  if (screen === "processing") return <ProcessingPage importId={activeImportId} onNavigate={navigate} />;
   if (screen === "review") return <ReviewPage onNavigate={navigate} />;
   if (screen === "preview") return <PreviewPage onNavigate={navigate} />;
 
@@ -182,19 +184,37 @@ export default function Home() {
 }
 
 function Dashboard({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const projects = [
+  const previewProjects = [
     { title: "Verdant Heights", place: "Kharadi, Pune", price: "₹1.48 Cr", status: "Published", views: 284, image: photos[0] },
     { title: "The Canopy", place: "Baner, Pune", price: "₹2.10 Cr", status: "Published", views: 146, image: photos[2] },
     { title: "Riverstone", place: "Koregaon Park, Pune", price: "₹3.25 Cr", status: "Draft", views: 0, image: photos[4] },
   ];
+  const [savedProjects, setSavedProjects] = useState<PropertySummary[]>([]);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    listProperties().then((properties) => active && setSavedProjects(properties)).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  const projects = isSupabaseConfigured
+    ? savedProjects.map((property, index) => ({
+        title: property.title,
+        place: [property.locality, property.city].filter(Boolean).join(", ") || "Location pending review",
+        price: property.price_label || "Price pending review",
+        status: property.status === "published" ? "Published" : property.status === "importing" ? "Importing" : "Draft",
+        views: 0,
+        image: photos[index % photos.length],
+      }))
+    : previewProjects;
+  const activePropertyCount = isSupabaseConfigured ? savedProjects.filter((property) => property.status === "published").length : 2;
   return <main className="app-shell">
     <aside><button className="brand" onClick={() => onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><nav><button className="active">⌂ <span>Overview</span></button><button onClick={() => onNavigate("properties")}>▱ <span>Properties</span><small>4</small></button><button>⌁ <span>Analytics</span></button><button>♙ <span>Leads</span></button></nav><div className="aside-bottom"><button>⚙ <span>Settings</span></button><div className="user"><div>AM</div><span><strong>Abhi Mehta</strong><small>Prophunt LLP</small></span><b>⋯</b></div></div></aside>
     <section className="dashboard-main">
       <header><div><p>MONDAY, 27 JULY</p><h1>Good morning, Abhi.</h1></div><button className="button coral" onClick={() => onNavigate("ai-upload")}>✦ Create with AI</button></header>
       <button className="ai-quickstart" onClick={() => onNavigate("ai-upload")}><span>✦</span><div><strong>Turn a developer package into a microsite</strong><small>Upload brochures, price sheets, floor plans, photos and copied text together.</small></div><b>Start AI import ↗</b></button>
-      <div className="metrics"><article><span>TOTAL VIEWS</span><strong>1,284</strong><small className="up">↗ 18.2% this month</small></article><article><span>ACTIVE PROPERTIES</span><strong>2 <small>/ 5</small></strong><small>Starter plan allowance</small></article><article><span>WHATSAPP CLICKS</span><strong>93</strong><small className="up">↗ 12.4% this month</small></article><article className="mini-chart"><span>VIEWS THIS WEEK</span><div><i style={{height:"32%"}}/><i style={{height:"55%"}}/><i style={{height:"42%"}}/><i style={{height:"76%"}}/><i style={{height:"62%"}}/><i style={{height:"90%"}}/><i style={{height:"72%"}}/></div></article></div>
+      <div className="metrics"><article><span>TOTAL VIEWS</span><strong>{isSupabaseConfigured?"0":"1,284"}</strong><small className={isSupabaseConfigured?"":"up"}>{isSupabaseConfigured?"Tracking starts after publishing":"↗ 18.2% this month"}</small></article><article><span>ACTIVE PROPERTIES</span><strong>{activePropertyCount} <small>/ 5</small></strong><small>Starter plan allowance</small></article><article><span>WHATSAPP CLICKS</span><strong>{isSupabaseConfigured?"0":"93"}</strong><small className={isSupabaseConfigured?"":"up"}>{isSupabaseConfigured?"No clicks recorded yet":"↗ 12.4% this month"}</small></article><article className="mini-chart"><span>VIEWS THIS WEEK</span><div><i style={{height:isSupabaseConfigured?"4%":"32%"}}/><i style={{height:isSupabaseConfigured?"4%":"55%"}}/><i style={{height:isSupabaseConfigured?"4%":"42%"}}/><i style={{height:isSupabaseConfigured?"4%":"76%"}}/><i style={{height:isSupabaseConfigured?"4%":"62%"}}/><i style={{height:isSupabaseConfigured?"4%":"90%"}}/><i style={{height:isSupabaseConfigured?"4%":"72%"}}/></div></article></div>
       <div className="dash-title"><div><h2>Your properties</h2><p>Manage and share every project from one place.</p></div><div className="search">⌕ <input aria-label="Search properties" placeholder="Search properties"/></div></div>
-      <div className="project-grid">{projects.map((p, i)=><article className="project-card" key={p.title} onClick={() => i === 0 && onNavigate("property")}><div className="project-image"><img src={p.image} alt=""/><span className={p.status === "Draft" ? "draft" : ""}>● {p.status}</span><button aria-label="More options">⋯</button></div><div className="project-info"><span>{p.place}</span><h3>{p.title}</h3><p>3 BHK · {p.price} onwards</p><div><small>◎ {p.views} views</small><small>↗ Share</small></div></div></article>)}
+      <div className="project-grid">{projects.map((p, i)=><article className="project-card" key={`${p.title}-${i}`} onClick={() => !isSupabaseConfigured && i === 0 && onNavigate("property")}><div className="project-image"><img src={p.image} alt=""/><span className={p.status === "Published" ? "" : "draft"}>● {p.status}</span><button aria-label="More options">⋯</button></div><div className="project-info"><span>{p.place}</span><h3>{p.title}</h3><p>{p.price}{p.price.includes("pending")?"":" onwards"}</p><div><small>◎ {p.views} views</small><small>{p.status==="Published"?"↗ Share":"Continue setup"}</small></div></div></article>)}
       <button className="add-card" onClick={() => onNavigate("ai-upload")}><span>✦</span><strong>Create with AI</strong><small>Upload everything in one go</small></button></div>
     </section>
   </main>;
@@ -206,8 +226,34 @@ function PropertiesPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [status, setStatus] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All Pune");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [savedProperties, setSavedProperties] = useState<PropertySummary[]>([]);
+  const [libraryError, setLibraryError] = useState("");
 
-  const filtered = propertyInventory.filter((property) => {
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    listProperties()
+      .then((properties) => active && setSavedProperties(properties))
+      .catch((reason) => active && setLibraryError(reason instanceof Error ? reason.message : "Could not load properties."));
+    return () => { active = false; };
+  }, []);
+
+  const inventory = isSupabaseConfigured
+    ? savedProperties.map((property) => ({
+        title: property.title,
+        developer: property.developer_name || "Developer pending review",
+        place: [property.locality, property.city].filter(Boolean).join(", ") || "Location pending review",
+        price: property.price_label || "Price pending review",
+        config: property.configuration_label || "Configuration pending review",
+        status: property.status === "published" ? "Published" : "Draft",
+        views: 0,
+        leads: 0,
+        updated: new Date(property.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        image: photos[0],
+      }))
+    : propertyInventory;
+
+  const filtered = inventory.filter((property) => {
     const matchesQuery = `${property.title} ${property.developer} ${property.place}`.toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === "All" || property.status === status;
     const matchesLocation = locationFilter === "All Pune" || property.place.startsWith(locationFilter);
@@ -243,6 +289,7 @@ function PropertiesPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
         <label>Property type<select><option>All configurations</option><option>2 BHK</option><option>3 BHK</option><option>4 BHK</option></select></label>
         <button onClick={()=>{setStatus("All");setLocationFilter("All Pune");setQuery("");}}>Clear filters</button>
       </div>
+      {libraryError&&<p className="library-error" role="alert">{libraryError}</p>}
       {view === "grid" ? <div className="inventory-grid">
         {filtered.map((property, index)=><article className="inventory-card" key={property.title} onClick={()=>index===0&&onNavigate("property")}>
           <div className="inventory-photo"><img src={property.image} alt={`${property.title} property`}/><span className={property.status==="Draft"?"draft":""}>● {property.status}</span><button aria-label={`More actions for ${property.title}`}>⋯</button></div>
@@ -380,29 +427,123 @@ function OnboardingPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   </main>;
 }
 
-function AiUploadPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [files, setFiles] = useState(["Verdant_Heights_Brochure.pdf","PriceList_July_2026.xlsx","3BHK_FloorPlan.png","Project_Photos.zip"]);
-  const [text, setText] = useState("New launch in Kharadi. 3 and 4 BHK premium residences. Possession December 2028. Near EON IT Park. Current offer valid until 31 July.");
+type QueuedFile = {
+  id: string;
+  name: string;
+  size: number;
+  file?: File;
+};
+
+const demoQueuedFiles: QueuedFile[] = [
+  { id: "demo-1", name: "Verdant_Heights_Brochure.pdf", size: 18_400_000 },
+  { id: "demo-2", name: "PriceList_July_2026.xlsx", size: 426_000 },
+  { id: "demo-3", name: "3BHK_FloorPlan.png", size: 3_200_000 },
+  { id: "demo-4", name: "Project_Photos.zip", size: 3_200_000 },
+];
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1_000))} KB`;
+}
+
+function AiUploadPage({ onNavigate, onImportCreated }: { onNavigate: (s: Screen) => void; onImportCreated: (id: string | null) => void }) {
+  const [files, setFiles] = useState<QueuedFile[]>(isSupabaseConfigured ? [] : demoQueuedFiles);
+  const [text, setText] = useState(isSupabaseConfigured ? "" : "New launch in Kharadi. 3 and 4 BHK premium residences. Possession December 2028. Near EON IT Park. Current offer valid until 31 July.");
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const addFiles = (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    const selected = Array.from(selectedFiles);
+    const accepted = selected.filter((file) => file.size <= 100_000_000);
+    if (accepted.length !== selected.length) {
+      setError("Files larger than 100 MB were not added.");
+    } else {
+      setError("");
+    }
+    setFiles((current) => [
+      ...current,
+      ...accepted.map((file) => ({
+        id: crypto.randomUUID(),
+        name: file.name,
+        size: file.size,
+        file,
+      })),
+    ]);
+  };
+  const generateDraft = async () => {
+    if (!files.length && !text.trim()) {
+      setError("Add at least one project file or paste the developer notes.");
+      return;
+    }
+    setUploading(true);
+    setError("");
+    try {
+      if (isSupabaseConfigured) {
+        const created = await createPropertyImport({
+          files: files.flatMap((item) => item.file ? [item.file] : []),
+          sourceNotes: text,
+        });
+        onImportCreated(created.importId);
+      } else {
+        onImportCreated(null);
+      }
+      onNavigate("processing");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The project package could not be uploaded.");
+    } finally {
+      setUploading(false);
+    }
+  };
   return <main className="upload-shell">
     <header><button className="brand" onClick={()=>onNavigate("dashboard")}><span className="brand-mark">N</span><span>nestory</span></button><div><span>New project</span><button onClick={()=>onNavigate("dashboard")}>Save & exit</button></div></header>
     <section className="upload-intro"><span className="ai-pill">✦ CREATE WITH AI</span><h1>Upload everything you received.</h1><p>Add the developer brochure, price sheet, floor plans, images and copied messages together. Nestory will organise them into one project draft.</p></section>
     <section className="upload-workspace">
       <div className="upload-primary">
-        <label className="mega-dropzone"><input type="file" multiple accept=".pdf,.xlsx,.xls,.docx,.jpg,.jpeg,.png,.webp,.zip" onChange={(event)=>setFiles([...files,...Array.from(event.target.files||[]).map(file=>file.name)])}/><span>↥</span><h2>Drop all project files here</h2><p>PDF, XLSX, DOCX, JPG, PNG, WebP or ZIP · Up to 100 MB each</p><b>Browse files</b></label>
-        <div className="uploaded-files"><div><span>FILES READY</span><small>{files.length} sources</small></div>{files.map((file,index)=><article key={`${file}-${index}`}><span className={`file-badge ${file.toLowerCase().includes("pdf")?"pdf":file.toLowerCase().includes("xls")?"xls":"img"}`}>{file.split(".").pop()?.toUpperCase()}</span><p><strong>{file}</strong><small>{index===0?"18.4 MB":index===1?"426 KB":"3.2 MB"} · Ready</small></p><button aria-label={`Remove ${file}`} onClick={()=>setFiles(files.filter((_,item)=>item!==index))}>×</button></article>)}</div>
+        <label className="mega-dropzone"><input type="file" multiple accept=".pdf,.xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.webp,.zip" onChange={(event)=>addFiles(event.target.files)}/><span>↥</span><h2>Drop all project files here</h2><p>PDF, XLSX, DOCX, JPG, PNG, WebP or ZIP · Up to 100 MB each</p><b>Browse files</b></label>
+        <div className="uploaded-files"><div><span>FILES READY</span><small>{files.length} sources</small></div>{files.map((item)=><article key={item.id}><span className={`file-badge ${item.name.toLowerCase().includes("pdf")?"pdf":item.name.toLowerCase().includes("xls")?"xls":"img"}`}>{item.name.split(".").pop()?.toUpperCase()}</span><p><strong>{item.name}</strong><small>{formatFileSize(item.size)} · Ready</small></p><button aria-label={`Remove ${item.name}`} onClick={()=>setFiles(files.filter((file)=>file.id!==item.id))}>×</button></article>)}</div>
       </div>
       <aside className="paste-panel"><span>PASTE DEVELOPER TEXT</span><h2>Add the WhatsApp or email notes.</h2><p>AI will compare these notes with the uploaded documents.</p><textarea value={text} onChange={(event)=>setText(event.target.value)} placeholder="Paste the developer's message here…"/><div className="privacy-note"><span>⌾</span><p><strong>Your files stay private</strong><small>Nothing is published until you review and approve it.</small></p></div></aside>
     </section>
-    <div className="upload-footer"><button className="button outline" onClick={()=>onNavigate("new")}>Create manually</button><div><span>{files.length} files + pasted text ready</span><button className="button coral" onClick={()=>onNavigate("processing")}>Generate project draft <span>✦</span></button></div></div>
+    {error&&<p className="upload-error" role="alert">{error}</p>}
+    <div className="upload-footer"><button className="button outline" onClick={()=>onNavigate("new")}>Create manually</button><div><span>{files.length} files{text.trim()?" + pasted text":""} ready</span><button className="button coral" disabled={uploading} onClick={generateDraft}>{uploading?"Securing project sources…":"Generate project draft"} <span>{uploading?"◌":"✦"}</span></button></div></div>
   </main>;
 }
 
-function ProcessingPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+function ProcessingPage({ onNavigate, importId }: { onNavigate: (s: Screen) => void; importId: string | null }) {
   const [phase, setPhase] = useState(0);
+  const [job, setJob] = useState<ImportStatus | null>(null);
+  const [statusError, setStatusError] = useState("");
   const stages = ["Securing your uploads","Reading brochures and text","Finding project facts","Sorting photos and floor plans","Comparing prices and configurations","Building your microsite draft"];
-  useEffect(()=>{const timer=window.setInterval(()=>setPhase(value=>value<stages.length?value+1:value),650);return()=>window.clearInterval(timer);},[stages.length]);
-  const done = phase >= stages.length;
-  return <main className="processing-shell"><button className="brand" onClick={()=>onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><section><div className={`processing-orb ${done?"done":""}`}>{done?"✓":"✦"}<i/><i/><i/></div><span className="ai-pill">{done?"DRAFT READY":"NESTORY AI IS WORKING"}</span><h1>{done?"Your project draft is ready.":"Turning your files into a property page."}</h1><p>{done?"We found 24 project facts, sorted 18 photos and matched 4 floor plans. Two details need your confirmation.":"You can leave this screen. We’ll keep processing safely in the background."}</p><div className="processing-list">{stages.map((stage,index)=><div key={stage} className={index<phase?"complete":index===phase?"active":""}><span>{index<phase?"✓":index===phase?"◌":index+1}</span><strong>{stage}</strong><small>{index<phase?"Complete":index===phase?"Working…":"Waiting"}</small></div>)}</div>{done&&<button className="button coral" onClick={()=>onNavigate("review")}>Review extracted facts <Arrow /></button>}</section></main>;
+  const realImport = isSupabaseConfigured && Boolean(importId);
+  useEffect(()=>{
+    if (!realImport || !importId) {
+      const timer=window.setInterval(()=>setPhase(value=>value<stages.length?value+1:value),650);
+      return()=>window.clearInterval(timer);
+    }
+    let active = true;
+    const refresh = async () => {
+      try {
+        const next = await getPropertyImportStatus(importId);
+        if (active) {
+          setJob(next);
+          setStatusError("");
+        }
+      } catch (reason) {
+        if (active) setStatusError(reason instanceof Error ? reason.message : "Could not read import status.");
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 2500);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  },[importId, realImport, stages.length]);
+  const realPhase = !job ? 0 : job.status==="uploading"?0:job.status==="queued"?1:job.status==="processing"?Math.min(5,Math.max(1,Math.ceil(job.progress/20))):6;
+  const visiblePhase = realImport ? realPhase : phase;
+  const done = realImport ? job?.status==="needs_review"||job?.status==="completed" : phase >= stages.length;
+  const failed = realImport && job?.status==="failed";
+  return <main className="processing-shell"><button className="brand" onClick={()=>onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><section><div className={`processing-orb ${done?"done":""} ${failed?"failed":""}`}>{failed?"!":done?"✓":"✦"}<i/><i/><i/></div><span className="ai-pill">{failed?"IMPORT NEEDS ATTENTION":done?"DRAFT READY":job?.status==="queued"?"SOURCES SECURED · QUEUED":"NESTORY AI IS WORKING"}</span><h1>{failed?"We could not process this package.":done?"Your project draft is ready.":job?.status==="queued"?"Your files are safely queued.":"Turning your files into a property page."}</h1><p>{failed?(job?.error_message||"Return to the upload step and try again."):done?"Your extracted property facts are ready for broker approval.":"You can leave this screen. We’ll keep the import status attached to this property."}</p>{statusError&&<p className="auth-error" role="alert">{statusError}</p>}<div className="processing-list">{stages.map((stage,index)=><div key={stage} className={index<visiblePhase?"complete":index===visiblePhase?"active":""}><span>{index<visiblePhase?"✓":index===visiblePhase?"◌":index+1}</span><strong>{stage}</strong><small>{index<visiblePhase?"Complete":index===visiblePhase?(job?.status==="queued"?"Queued":"Working…"):"Waiting"}</small></div>)}</div>{done&&<button className="button coral" onClick={()=>onNavigate("review")}>Review extracted facts <Arrow /></button>}{failed&&<button className="button outline" onClick={()=>onNavigate("ai-upload")}>Return to upload</button>}{realImport&&!done&&!failed&&<button className="processing-leave" onClick={()=>onNavigate("properties")}>View property library</button>}</section></main>;
 }
 
 function ReviewPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {

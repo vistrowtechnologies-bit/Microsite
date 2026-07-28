@@ -12,8 +12,9 @@ deployed site intentionally remains in preview mode.
    local development URL as allowed redirect URLs.
 3. Keep email OTP enabled. Customize the email template with Prophunt LLP
    wording before inviting production users.
-4. Run `supabase/migrations/202607280001_phase_2_identity.sql` in the Supabase
-   SQL editor.
+4. Run every file in `supabase/migrations` in filename order in the Supabase
+   SQL editor. The second migration adds the property library, import queue,
+   private source-file bucket, and tenant storage policies.
 
 ## 2. Connect the application
 
@@ -36,3 +37,10 @@ Supabase service-role key.
 - A signed-in user cannot read another organization's membership or broker
   profile.
 - A user cannot complete onboarding twice.
+- A mixed project package creates one draft property and one import job.
+- Uploaded source files are stored privately under the member's organization.
+- A member cannot list, read, upload, or delete another organization's sources.
+
+The current product queues secured imports for the extraction worker. Automated
+PDF/spreadsheet extraction is the next backend phase; the UI does not silently
+claim that queued production imports have already been processed.

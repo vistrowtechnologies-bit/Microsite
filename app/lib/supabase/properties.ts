@@ -19,6 +19,25 @@ export type ImportStatus = {
   error_message: string | null;
 };
 
+export type FactEvidence = {
+  source_filename: string;
+  locator: string;
+  quote: string;
+};
+
+export type PropertyFact = {
+  id: string;
+  category: string;
+  fact_key: string;
+  label: string;
+  value_json: unknown;
+  confidence: number;
+  review_status: "extracted" | "needs_review" | "confirmed" | "rejected";
+  is_conflict: boolean;
+  conflicting_values: string[];
+  evidence: FactEvidence[];
+};
+
 const SOURCE_BUCKET = "property-source-files";
 
 function safeFilename(filename: string) {
@@ -146,4 +165,67 @@ export async function getPropertyImportStatus(importId: string) {
 
   if (error) throw error;
   return data as ImportStatus;
+}
+
+export async function startPropertyExtraction(importId: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sign in again to start extraction.");
+
+  const response = await fetch("/api/imports/process", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ import_id: importId }),
+  });
+
+  const result = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok && response.status !== 202) {
+    throw new Error(result.error || "Extraction could not be started.");
+  }
+}
+
+export async function listPropertyFacts(propertyId: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("property_facts")
+    .select("id,category,fact_key,label,value_json,confidence,review_status,is_conflict,conflicting_values,evidence")
+    .eq("property_id", propertyId)
+    .order("category")
+    .order("label");
+
+  if (error) throw error;
+  return (data ?? []) as PropertyFact[];
+}
+
+async function setPropertyFactReview(factId: string, value: string, reviewStatus: "confirmed" | "rejected") {
+  const supabase = getSupabaseBrowserClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!userData.user) throw new Error("Sign in again to review this fact.");
+
+  const { error } = await supabase
+    .from("property_facts")
+    .update({
+      value_json: value,
+      review_status: reviewStatus,
+      reviewed_by: userData.user.id,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", factId);
+
+  if (error) throw error;
+}
+
+export async function confirmPropertyFact(factId: string, value: string) {
+  return setPropertyFactReview(factId, value, "confirmed");
+}
+
+export async function rejectPropertyFact(factId: string, value: string) {
+  return setPropertyFactReview(factId, value, "rejected");
 }

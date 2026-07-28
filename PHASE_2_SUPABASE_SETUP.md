@@ -23,10 +23,15 @@ Add these values locally and to the production site environment:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
+OPENAI_API_KEY=YOUR_SERVER_ONLY_OPENAI_KEY
+OPENAI_EXTRACTION_MODEL=gpt-5.6
+IMPORT_WORKER_SECRET=GENERATE_A_LONG_RANDOM_SECRET
 ```
 
-Only the public anon key belongs in the browser environment. Never expose the
-Supabase service-role key.
+Only the first two `NEXT_PUBLIC_` values belong in the browser environment.
+The Supabase service-role key, OpenAI key, and worker secret must be stored as
+server-side production secrets and must never be exposed to browser code.
 
 ## 3. Acceptance checks
 
@@ -40,7 +45,13 @@ Supabase service-role key.
 - A mixed project package creates one draft property and one import job.
 - Uploaded source files are stored privately under the member's organization.
 - A member cannot list, read, upload, or delete another organization's sources.
+- A queued import can be claimed only once by the extraction endpoint.
+- Extracted facts persist with confidence, conflicts, evidence, and review state.
+- Publishing remains disabled until the broker confirms or rejects every fact;
+  dynamic property-page publishing is implemented in the following phase.
 
-The current product queues secured imports for the extraction worker. Automated
-PDF/spreadsheet extraction is the next backend phase; the UI does not silently
-claim that queued production imports have already been processed.
+The extraction endpoint sends supported private sources through short-lived
+signed URLs. It uses the OpenAI Responses API with structured output and stores
+the resulting facts for human review. ZIP archives and documents beyond the
+model's per-request file limit remain stored and are surfaced as warnings for a
+later batching/unpacking pass.

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { completeBrokerOnboarding, hasOrganizationMembership, sendEmailOtp, verifyEmailOtp } from "./lib/supabase/auth";
 import { isSupabaseConfigured } from "./lib/supabase/client";
-import { createPropertyImport, getPropertyImportStatus, listProperties, type ImportStatus, type PropertySummary } from "./lib/supabase/properties";
+import { confirmPropertyFact, createPropertyImport, getPropertyImportStatus, listProperties, listPropertyFacts, rejectPropertyFact, startPropertyExtraction, type ImportStatus, type PropertyFact, type PropertySummary } from "./lib/supabase/properties";
 
 type Screen = "home" | "login" | "signup" | "verify" | "onboarding" | "dashboard" | "properties" | "property" | "new" | "ai-upload" | "processing" | "review" | "preview";
 
@@ -31,6 +31,7 @@ export default function Home() {
   const [demoStep, setDemoStep] = useState(0);
   const [authEmail, setAuthEmail] = useState("abhi@prophuntllp.com");
   const [activeImportId, setActiveImportId] = useState<string | null>(null);
+  const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
 
   const navigate = (next: Screen) => {
     setScreen(next);
@@ -46,10 +47,13 @@ export default function Home() {
   if (screen === "signup") return <AuthPage mode="signup" onNavigate={navigate} onEmail={setAuthEmail} />;
   if (screen === "verify") return <VerifyPage email={authEmail} onNavigate={navigate} />;
   if (screen === "onboarding") return <OnboardingPage onNavigate={navigate} />;
-  if (screen === "ai-upload") return <AiUploadPage onNavigate={navigate} onImportCreated={setActiveImportId} />;
+  if (screen === "ai-upload") return <AiUploadPage onNavigate={navigate} onImportCreated={(result) => {
+    setActiveImportId(result?.importId ?? null);
+    setActivePropertyId(result?.propertyId ?? null);
+  }} />;
   if (screen === "processing") return <ProcessingPage importId={activeImportId} onNavigate={navigate} />;
-  if (screen === "review") return <ReviewPage onNavigate={navigate} />;
-  if (screen === "preview") return <PreviewPage onNavigate={navigate} />;
+  if (screen === "review") return <ReviewPage propertyId={activePropertyId} onNavigate={navigate} />;
+  if (screen === "preview") return <PreviewPage propertyId={activePropertyId} onNavigate={navigate} />;
 
   return (
     <main className="marketing">
@@ -446,7 +450,7 @@ function formatFileSize(bytes: number) {
   return `${Math.max(1, Math.round(bytes / 1_000))} KB`;
 }
 
-function AiUploadPage({ onNavigate, onImportCreated }: { onNavigate: (s: Screen) => void; onImportCreated: (id: string | null) => void }) {
+function AiUploadPage({ onNavigate, onImportCreated }: { onNavigate: (s: Screen) => void; onImportCreated: (result: { propertyId: string; importId: string } | null) => void }) {
   const [files, setFiles] = useState<QueuedFile[]>(isSupabaseConfigured ? [] : demoQueuedFiles);
   const [text, setText] = useState(isSupabaseConfigured ? "" : "New launch in Kharadi. 3 and 4 BHK premium residences. Possession December 2028. Near EON IT Park. Current offer valid until 31 July.");
   const [uploading, setUploading] = useState(false);
@@ -483,7 +487,7 @@ function AiUploadPage({ onNavigate, onImportCreated }: { onNavigate: (s: Screen)
           files: files.flatMap((item) => item.file ? [item.file] : []),
           sourceNotes: text,
         });
-        onImportCreated(created.importId);
+        onImportCreated(created);
       } else {
         onImportCreated(null);
       }
@@ -513,8 +517,16 @@ function ProcessingPage({ onNavigate, importId }: { onNavigate: (s: Screen) => v
   const [phase, setPhase] = useState(0);
   const [job, setJob] = useState<ImportStatus | null>(null);
   const [statusError, setStatusError] = useState("");
+  const extractionStarted = useRef(false);
   const stages = ["Securing your uploads","Reading brochures and text","Finding project facts","Sorting photos and floor plans","Comparing prices and configurations","Building your microsite draft"];
   const realImport = isSupabaseConfigured && Boolean(importId);
+  useEffect(() => {
+    if (!realImport || !importId || extractionStarted.current) return;
+    extractionStarted.current = true;
+    startPropertyExtraction(importId).catch((reason) => {
+      setStatusError(reason instanceof Error ? reason.message : "Extraction could not be started.");
+    });
+  }, [importId, realImport]);
   useEffect(()=>{
     if (!realImport || !importId) {
       const timer=window.setInterval(()=>setPhase(value=>value<stages.length?value+1:value),650);
@@ -546,30 +558,114 @@ function ProcessingPage({ onNavigate, importId }: { onNavigate: (s: Screen) => v
   return <main className="processing-shell"><button className="brand" onClick={()=>onNavigate("home")}><span className="brand-mark">N</span><span>nestory</span></button><section><div className={`processing-orb ${done?"done":""} ${failed?"failed":""}`}>{failed?"!":done?"✓":"✦"}<i/><i/><i/></div><span className="ai-pill">{failed?"IMPORT NEEDS ATTENTION":done?"DRAFT READY":job?.status==="queued"?"SOURCES SECURED · QUEUED":"NESTORY AI IS WORKING"}</span><h1>{failed?"We could not process this package.":done?"Your project draft is ready.":job?.status==="queued"?"Your files are safely queued.":"Turning your files into a property page."}</h1><p>{failed?(job?.error_message||"Return to the upload step and try again."):done?"Your extracted property facts are ready for broker approval.":"You can leave this screen. We’ll keep the import status attached to this property."}</p>{statusError&&<p className="auth-error" role="alert">{statusError}</p>}<div className="processing-list">{stages.map((stage,index)=><div key={stage} className={index<visiblePhase?"complete":index===visiblePhase?"active":""}><span>{index<visiblePhase?"✓":index===visiblePhase?"◌":index+1}</span><strong>{stage}</strong><small>{index<visiblePhase?"Complete":index===visiblePhase?(job?.status==="queued"?"Queued":"Working…"):"Waiting"}</small></div>)}</div>{done&&<button className="button coral" onClick={()=>onNavigate("review")}>Review extracted facts <Arrow /></button>}{failed&&<button className="button outline" onClick={()=>onNavigate("ai-upload")}>Return to upload</button>}{realImport&&!done&&!failed&&<button className="processing-leave" onClick={()=>onNavigate("properties")}>View property library</button>}</section></main>;
 }
 
-function ReviewPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+function factValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  return JSON.stringify(value);
+}
+
+function ReviewPage({ onNavigate, propertyId }: { onNavigate: (s: Screen) => void; propertyId: string | null }) {
+  const realReview = isSupabaseConfigured && Boolean(propertyId);
   const [section, setSection] = useState("Project basics");
   const [confirmed, setConfirmed] = useState(6);
-  const sections = [["Project basics","6/6"],["RERA & possession","2/3"],["Configurations","4/4"],["Pricing","3/4"],["Highlights","5/5"],["Amenities","12/12"],["Floor plans","4/4"],["Gallery","18/18"],["Location","7/8"],["Documents","3/3"]];
+  const [facts, setFacts] = useState<PropertyFact[]>([]);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [activeFactId, setActiveFactId] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+  const demoSections = [["Project basics","6/6"],["RERA & possession","2/3"],["Configurations","4/4"],["Pricing","3/4"],["Highlights","5/5"],["Amenities","12/12"],["Floor plans","4/4"],["Gallery","18/18"],["Location","7/8"],["Documents","3/3"]];
+
+  useEffect(() => {
+    if (!realReview || !propertyId) return;
+    let active = true;
+    listPropertyFacts(propertyId)
+      .then((items) => {
+        if (!active) return;
+        setFacts(items);
+        setDraftValues(Object.fromEntries(items.map((fact) => [fact.id, factValue(fact.value_json)])));
+        if (items[0]) {
+          setSection(items[0].category);
+          setActiveFactId(items[0].id);
+        }
+      })
+      .catch((reason) => active && setReviewError(reason instanceof Error ? reason.message : "Could not load extracted facts."));
+    return () => { active = false; };
+  }, [propertyId, realReview]);
+
+  const categoryNames = Array.from(new Set(facts.map((fact) => fact.category)));
+  const realSections = categoryNames.map((name) => {
+    const categoryFacts = facts.filter((fact) => fact.category === name);
+    const reviewed = categoryFacts.filter((fact) => fact.review_status === "confirmed" || fact.review_status === "rejected").length;
+    return [name, `${reviewed}/${categoryFacts.length}`];
+  });
+  const sections = realReview ? realSections : demoSections;
+  const visibleFacts = facts.filter((fact) => fact.category === section);
+  const reviewedCount = facts.filter((fact) => fact.review_status === "confirmed" || fact.review_status === "rejected").length;
+  const needsReviewCount = facts.filter((fact) => fact.review_status === "needs_review").length;
+  const sectionReviewed = visibleFacts.filter((fact) => fact.review_status === "confirmed" || fact.review_status === "rejected").length;
+  const activeFact = facts.find((fact) => fact.id === activeFactId) || visibleFacts[0];
+  const evidence = activeFact?.evidence?.[0];
+  const projectName = factValue(facts.find((fact) => fact.fact_key === "project_name")?.value_json) || "AI property draft";
+  const reviewComplete = facts.length > 0 && reviewedCount === facts.length;
+
+  const reviewFacts = async (items: PropertyFact[], status: "confirmed" | "rejected") => {
+    setSavingReview(true);
+    setReviewError("");
+    try {
+      await Promise.all(items.map((fact) => status === "confirmed"
+        ? confirmPropertyFact(fact.id, draftValues[fact.id] ?? factValue(fact.value_json))
+        : rejectPropertyFact(fact.id, draftValues[fact.id] ?? factValue(fact.value_json))));
+      const reviewedIds = new Set(items.map((fact) => fact.id));
+      setFacts((current) => current.map((fact) => reviewedIds.has(fact.id) ? { ...fact, review_status: status } : fact));
+    } catch (reason) {
+      setReviewError(reason instanceof Error ? reason.message : "The review decision could not be saved.");
+    } finally {
+      setSavingReview(false);
+    }
+  };
+
+  if (!realReview) {
+    return <main className="review-shell">
+      <header><button className="brand" onClick={()=>onNavigate("dashboard")}><span className="brand-mark">N</span><span>nestory</span></button><div><span><b>Verdant Heights</b><small>AI draft · Autosaved</small></span><button className="button outline" onClick={()=>onNavigate("preview")}>Preview</button><button className="button coral" onClick={()=>onNavigate("preview")}>Finish review <Arrow /></button></div></header>
+      <aside className="review-nav"><div><span>REVIEW PROGRESS</span><strong>42 of 45 facts</strong><div><i style={{width:"93%"}}/></div><small>2 need review · 1 missing</small></div>{demoSections.map(([name,count])=><button key={name} className={section===name?"active":""} onClick={()=>setSection(name)}><span>{name}</span><small>{count}</small></button>)}</aside>
+      <section className="review-editor"><div className="review-heading"><span className="auth-kicker">AI-EXTRACTED CONTENT</span><h1>{section}</h1><p>Confirm the facts Nestory found. Select any source label to see where it came from.</p></div>
+        <div className="review-fields">
+          <label><span>Project name <b className="confidence high">96% confidence</b></span><input defaultValue="Verdant Heights"/><small>◉ Brochure · Page 1</small></label>
+          <label><span>Developer <b className="confidence high">94% confidence</b></span><input defaultValue="Aurum Developers"/><small>◉ Brochure · Page 2</small></label>
+          <label><span>Location <b className="confidence high">98% confidence</b></span><input defaultValue="Kharadi, Pune"/><small>◉ Brochure · Page 4</small></label>
+          <div className="review-row"><label><span>Starting price <b className="confidence medium">Needs review</b></span><input defaultValue="₹1.48 Cr"/><small>◉ Price sheet · Row 3</small></label><label><span>Possession <b className="confidence medium">Conflict</b></span><select defaultValue="December 2028"><option>December 2028</option><option>March 2029</option></select><small>Brochure says Dec ’28 · RERA says Mar ’29</small></label></div>
+          <label><span>Buyer-friendly summary <b className="confidence ai">✦ AI written</b></span><textarea defaultValue="Verdant Heights brings generous, light-filled homes to the heart of Kharadi. Three thoughtfully planned towers sit within five acres of landscaped calm, minutes from EON IT Park."/></label>
+        </div>
+        <div className="review-confirm"><span><b>{confirmed}/6</b> facts confirmed in this section</span><button className="button coral" onClick={()=>setConfirmed(6)}>✓ Confirm section</button></div>
+      </section>
+      <aside className="source-viewer"><div><span>SOURCE EVIDENCE</span><button>↗ Open original</button></div><article className="pdf-page"><span>AURUM</span><h2>Verdant Heights</h2><p>Elevated living in the heart of Kharadi</p><div className="source-highlight">Premium 3 & 4 BHK residences<br/>Starting from ₹1.48 Cr*</div><small>PRICE LIST · VALID JULY 2026</small></article><div className="source-meta"><strong>Verdant_Heights_Brochure.pdf</strong><small>Page 1 of 42 · Uploaded today</small></div></aside>
+    </main>;
+  }
+
   return <main className="review-shell">
-    <header><button className="brand" onClick={()=>onNavigate("dashboard")}><span className="brand-mark">N</span><span>nestory</span></button><div><span><b>Verdant Heights</b><small>AI draft · Autosaved</small></span><button className="button outline" onClick={()=>onNavigate("preview")}>Preview</button><button className="button coral" onClick={()=>onNavigate("preview")}>Finish review <Arrow /></button></div></header>
-    <aside className="review-nav"><div><span>REVIEW PROGRESS</span><strong>42 of 45 facts</strong><div><i style={{width:"93%"}}/></div><small>2 need review · 1 missing</small></div>{sections.map(([name,count])=><button key={name} className={section===name?"active":""} onClick={()=>setSection(name)}><span>{name}</span><small>{count}</small></button>)}</aside>
-    <section className="review-editor"><div className="review-heading"><span className="auth-kicker">AI-EXTRACTED CONTENT</span><h1>{section}</h1><p>Confirm the facts Nestory found. Select any source label to see where it came from.</p></div>
-      <div className="review-fields">
-        <label><span>Project name <b className="confidence high">96% confidence</b></span><input defaultValue="Verdant Heights"/><small>◉ Brochure · Page 1</small></label>
-        <label><span>Developer <b className="confidence high">94% confidence</b></span><input defaultValue="Aurum Developers"/><small>◉ Brochure · Page 2</small></label>
-        <label><span>Location <b className="confidence high">98% confidence</b></span><input defaultValue="Kharadi, Pune"/><small>◉ Brochure · Page 4</small></label>
-        <div className="review-row"><label><span>Starting price <b className="confidence medium">Needs review</b></span><input defaultValue="₹1.48 Cr"/><small>◉ Price sheet · Row 3</small></label><label><span>Possession <b className="confidence medium">Conflict</b></span><select defaultValue="December 2028"><option>December 2028</option><option>March 2029</option></select><small>Brochure says Dec ’28 · RERA says Mar ’29</small></label></div>
-        <label><span>Buyer-friendly summary <b className="confidence ai">✦ AI written</b></span><textarea defaultValue="Verdant Heights brings generous, light-filled homes to the heart of Kharadi. Three thoughtfully planned towers sit within five acres of landscaped calm, minutes from EON IT Park."/></label>
-      </div>
-      <div className="review-confirm"><span><b>{confirmed}/6</b> facts confirmed in this section</span><button className="button coral" onClick={()=>setConfirmed(6)}>✓ Confirm section</button></div>
+    <header><button className="brand" onClick={()=>onNavigate("dashboard")}><span className="brand-mark">N</span><span>nestory</span></button><div><span><b>{projectName}</b><small>Source-grounded AI draft · Autosaved</small></span><button className="button outline" onClick={()=>onNavigate("preview")}>Preview</button><button className="button coral" disabled={!reviewComplete} onClick={()=>onNavigate("preview")}>Finish review <Arrow /></button></div></header>
+    <aside className="review-nav"><div><span>REVIEW PROGRESS</span><strong>{reviewedCount} of {facts.length} facts</strong><div><i style={{width:`${facts.length ? reviewedCount/facts.length*100 : 0}%`}}/></div><small>{needsReviewCount} flagged by AI · human approval required</small></div>{sections.map(([name,count])=><button key={name} className={section===name?"active":""} onClick={()=>{setSection(name);setActiveFactId(facts.find((fact)=>fact.category===name)?.id??null);}}><span>{name}</span><small>{count}</small></button>)}</aside>
+    <section className="review-editor"><div className="review-heading"><span className="auth-kicker">SOURCE-GROUNDED CONTENT</span><h1>{section}</h1><p>Confirm, edit, or reject each extracted fact before anything can be published.</p></div>
+      {reviewError&&<p className="auth-error" role="alert">{reviewError}</p>}
+      {!facts.length&&!reviewError&&<div className="review-empty"><span>◌</span><h2>Loading extracted facts…</h2><p>The property stays private while the review workspace is prepared.</p></div>}
+      <div className="review-fields">{visibleFacts.map((fact)=><label key={fact.id} className={fact.review_status==="rejected"?"rejected":""}><span>{fact.label}<b className={`confidence ${fact.is_conflict||fact.confidence<.85?"medium":"high"}`}>{fact.is_conflict?"Conflict":`${Math.round(fact.confidence*100)}% confidence`}</b></span><input value={draftValues[fact.id]??""} onChange={(event)=>setDraftValues({...draftValues,[fact.id]:event.target.value})}/>{fact.is_conflict&&<em className="fact-conflict">Conflicting sources: {fact.conflicting_values.join(" · ")}</em>}<div className="fact-review-actions"><button type="button" onClick={()=>setActiveFactId(fact.id)}>◉ {fact.evidence?.[0]?.source_filename||"No source"} {fact.evidence?.[0]?.locator?`· ${fact.evidence[0].locator}`:""}</button><span className={fact.review_status}>{fact.review_status.replace("_"," ")}</span><button type="button" disabled={savingReview} onClick={()=>reviewFacts([fact],"rejected")}>Reject</button><button type="button" disabled={savingReview} onClick={()=>reviewFacts([fact],"confirmed")}>✓ Confirm</button></div></label>)}</div>
+      {!!visibleFacts.length&&<div className="review-confirm"><span><b>{sectionReviewed}/{visibleFacts.length}</b> facts reviewed in this section</span><button className="button coral" disabled={savingReview} onClick={()=>reviewFacts(visibleFacts,"confirmed")}>{savingReview?"Saving decisions…":"✓ Confirm section"}</button></div>}
     </section>
-    <aside className="source-viewer"><div><span>SOURCE EVIDENCE</span><button>↗ Open original</button></div><article className="pdf-page"><span>AURUM</span><h2>Verdant Heights</h2><p>Elevated living in the heart of Kharadi</p><div className="source-highlight">Premium 3 & 4 BHK residences<br/>Starting from ₹1.48 Cr*</div><small>PRICE LIST · VALID JULY 2026</small></article><div className="source-meta"><strong>Verdant_Heights_Brochure.pdf</strong><small>Page 1 of 42 · Uploaded today</small></div></aside>
+    <aside className="source-viewer"><div><span>SOURCE EVIDENCE</span><button disabled={!evidence}>VERIFIED INPUT</button></div>{evidence?<><article className="evidence-card"><span>{activeFact?.category}</span><h2>{activeFact?.label}</h2><p>“{evidence.quote}”</p><div className="source-highlight">{factValue(activeFact?.value_json)}</div><small>{evidence.locator||"Source location not supplied"}</small></article><div className="source-meta"><strong>{evidence.source_filename}</strong><small>{Math.round((activeFact?.confidence||0)*100)}% extraction confidence</small></div></>:<div className="review-empty compact"><span>!</span><h2>No source evidence</h2><p>Reject this fact or confirm it only after checking the original developer material.</p></div>}</aside>
   </main>;
 }
 
-function PreviewPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+function PreviewPage({ onNavigate, propertyId }: { onNavigate: (s: Screen) => void; propertyId: string | null }) {
   const [device, setDevice] = useState<"mobile"|"desktop">("mobile");
-  return <main className="preview-shell"><header><button className="brand" onClick={()=>onNavigate("review")}><span className="brand-mark">N</span><span>nestory</span></button><div className="device-toggle"><button className={device==="mobile"?"active":""} onClick={()=>setDevice("mobile")}>▯ Mobile</button><button className={device==="desktop"?"active":""} onClick={()=>setDevice("desktop")}>▰ Desktop</button></div><div><button className="button outline" onClick={()=>onNavigate("review")}>Continue editing</button><button className="button coral" onClick={()=>onNavigate("property")}>Publish page <Arrow /></button></div></header><section className={`preview-canvas ${device}`}><div className="preview-browser"><div className="preview-browser-bar"><span>● ● ●</span><b>your-property-link/p/verdant-heights</b><span>↗</span></div><div className="preview-site"><div className="preview-broker-bar"><span className="broker-mark small">PH</span><strong>Prophunt LLP</strong><small>RERA verified</small></div><img src={photos[0]} alt="Verdant Heights preview"/><div><span>NEW LAUNCH · RERA VERIFIED</span><h1>Verdant Heights</h1><p>Kharadi, Pune · by Aurum Developers</p><section><strong>3 & 4 BHK</strong><strong>₹1.48 Cr onwards</strong></section><button onClick={()=>onNavigate("property")}>View complete preview</button></div></div></div></section></main>;
+  const realPreview = isSupabaseConfigured && Boolean(propertyId);
+  const [reviewReady, setReviewReady] = useState(false);
+  useEffect(() => {
+    if (!realPreview || !propertyId) return;
+    listPropertyFacts(propertyId).then((facts) => {
+      setReviewReady(facts.length > 0 && facts.every((fact) => fact.review_status === "confirmed" || fact.review_status === "rejected"));
+    }).catch(() => setReviewReady(false));
+  }, [propertyId, realPreview]);
+  return <main className="preview-shell"><header><button className="brand" onClick={()=>onNavigate("review")}><span className="brand-mark">N</span><span>nestory</span></button><div className="device-toggle"><button className={device==="mobile"?"active":""} onClick={()=>setDevice("mobile")}>▯ Mobile</button><button className={device==="desktop"?"active":""} onClick={()=>setDevice("desktop")}>▰ Desktop</button></div><div><button className="button outline" onClick={()=>onNavigate("review")}>Continue editing</button><button className="button coral" disabled={realPreview} onClick={()=>onNavigate("property")}>{realPreview?(reviewReady?"Publish in next phase":"Review required"):"Publish page"} {!realPreview&&<Arrow />}</button></div></header>{realPreview&&<div className="preview-phase-note"><span>PRIVATE DRAFT</span><p>{reviewReady?"All extracted facts are reviewed. Dynamic microsite publishing is the next controlled phase.":"Publishing stays locked until every extracted fact is confirmed or rejected."}</p></div>}<section className={`preview-canvas ${device}`}><div className="preview-browser"><div className="preview-browser-bar"><span>● ● ●</span><b>your-property-link/p/verdant-heights</b><span>↗</span></div><div className="preview-site"><div className="preview-broker-bar"><span className="broker-mark small">PH</span><strong>Prophunt LLP</strong><small>RERA verified</small></div><img src={photos[0]} alt="Verdant Heights preview"/><div><span>NEW LAUNCH · RERA VERIFIED</span><h1>Verdant Heights</h1><p>Kharadi, Pune · by Aurum Developers</p><section><strong>3 & 4 BHK</strong><strong>₹1.48 Cr onwards</strong></section><button disabled={realPreview} onClick={()=>onNavigate("property")}>{realPreview?"Dynamic preview coming next":"View complete preview"}</button></div></div></div></section></main>;
 }
 
 function PropertyPage({ onNavigate }: { onNavigate: (s: Screen) => void }) {
